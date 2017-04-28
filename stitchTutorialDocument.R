@@ -1,3 +1,3 @@
 library( rmarkdown )
 
-render( "tutorial.Rmd" ,"pdf_document", clean = FALSE )
+render( "tutorial.Rmd" ,"pdf_document", clean = TRUE )
