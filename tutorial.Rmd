@@ -765,13 +765,10 @@ that this accounts for the colors not seeming to coordinate across Figures 1, 2,
 * (priorinitialization, line 350) Is the ``abs()`` call necessary?  I thought the elements
 of the eigenvector are constrained to be positive.
 
-* When you ask "How good were our original hypothetical regions as predictors?" The
-correlation testing for the testing data predictors for a strong prior would seem
-to indicate that these regions are okay but the fact that they drift away would
-seem to indicate otherwise.
-
+<!--
 * Does clustering in the pheatmap tell us anything?  Ben used it, I believe, in his
 paper.
+-->
 
 * In the tutorial, you set ``copt <- 0`` and write ``# 0 for most applications, 1 for priors``.
 However, in the rcode chunk ``priorinitialization`` you use ``mycoption = 0``.  Was there a
@@ -780,7 +777,7 @@ and low-dimensional orthogonality as these might be at odds, i.e., the notion of
 vs. pseudo-eigenvector.
 
 * For the various options of dealing with nuisance variables, could one residualize out the
-* effects of the nuisance variables and then just work on the "clean" data?
+effects of the nuisance variables and then just work on the "clean" data?
 
 
 \newpage
