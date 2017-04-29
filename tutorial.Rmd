@@ -613,8 +613,7 @@ cognitiveSccanResult <- sparseDecom2(
      inmatrix = list( scale( trainingImageResiduals ),
        scale( trainingCognitiveResiduals ) ),
      its = 20, mycoption = 0, sparseness = c( 0.02, -0.05 ), nvecs = 11,
-     inmask = c( grayMatterMask, NA ), cthresh = c( 1000, 0 ), verbose = TRUE,
-     smooth = 0.5 )
+     inmask = c( grayMatterMask, NA ), cthresh = c( 1000, 0 ), smooth = 0.5 )
 
 trainingImagePredictors <- trainingImageData %*% cognitiveSccanResult$eig1
 colnames( trainingImagePredictors ) <-
@@ -704,27 +703,83 @@ pander( cognitiveSccanDataFrame, style = "rmarkdown", caption = "The set of
   predictor regions for each eigenvector." )
 ```
 
-![Eigenvector 1 of the gray matter view (cf Table 5).](`r predictorRegionPlot3DFiles[1]`)
+![Eigenvector 1 of the gray matter imaging view (cf Table 5).](`r predictorRegionPlot3DFiles[1]`)
 
-![Eigenvector 2 of the gray matter view (cf Table 5).](`r predictorRegionPlot3DFiles[2]`)
+![Eigenvector 2 of the gray matter imaging view (cf Table 5).](`r predictorRegionPlot3DFiles[2]`)
 
-![Eigenvector 3 of the gray matter view (cf Table 5).](`r predictorRegionPlot3DFiles[3]`)
+![Eigenvector 3 of the gray matter imaging view (cf Table 5).](`r predictorRegionPlot3DFiles[3]`)
 
-![Eigenvector 4 of the gray matter view (cf Table 5).](`r predictorRegionPlot3DFiles[4]`)
+![Eigenvector 4 of the gray matter imaging view (cf Table 5).](`r predictorRegionPlot3DFiles[4]`)
 
-![Eigenvector 5 of the gray matter view (cf Table 5).](`r predictorRegionPlot3DFiles[5]`)
+![Eigenvector 5 of the gray matter imaging view (cf Table 5).](`r predictorRegionPlot3DFiles[5]`)
 
-![Eigenvector 6 of the gray matter view (cf Table 5).](`r predictorRegionPlot3DFiles[6]`)
+![Eigenvector 6 of the gray matter imaging view (cf Table 5).](`r predictorRegionPlot3DFiles[6]`)
 
-![Eigenvector 7 of the gray matter view (cf Table 5).](`r predictorRegionPlot3DFiles[7]`)
+![Eigenvector 7 of the gray matter imaging view (cf Table 5).](`r predictorRegionPlot3DFiles[7]`)
 
-![Eigenvector 8 of the gray matter view (cf Table 5).](`r predictorRegionPlot3DFiles[8]`)
+![Eigenvector 8 of the gray matter imaging view (cf Table 5).](`r predictorRegionPlot3DFiles[8]`)
 
-![Eigenvector 9 of the gray matter view (cf Table 5).](`r predictorRegionPlot3DFiles[9]`)
+![Eigenvector 9 of the gray matter imaging view (cf Table 5).](`r predictorRegionPlot3DFiles[9]`)
 
-![Eigenvector 10 of the gray matter view (cf Table 5).](`r predictorRegionPlot3DFiles[10]`)
+![Eigenvector 10 of the gray matter imaging view (cf Table 5).](`r predictorRegionPlot3DFiles[10]`)
 
-![Eigenvector 11 of the gray matter view (cf Table 5).](`r predictorRegionPlot3DFiles[11]`)
+![Eigenvector 11 of the gray matter imaging view (cf Table 5).](`r predictorRegionPlot3DFiles[11]`)
+
+# Predicting the full cognitive battery
+
+```{r multivariateprediction, fig.width = 8, fig.height = 4, echo = TRUE, message = FALSE, warning = FALSE, cache = TRUE}
+# We use SCCAN to transform the gray matter signal for predicting the full cognitive
+# battery.  
+
+# We recalculate the residualized because of r chunk caching.  
+
+trainingCognitiveResiduals <- residuals( lm(
+  trainingCognitiveMatrix ~ trainingCognitiveData$mmse + trainingCognitiveData$age ) )
+trainingImageResiduals <- residuals( lm( trainingImageData ~ trainingCognitiveData$mmse ) )
+
+cognitiveSccanResult <- sparseDecom2(
+     inmatrix = list( scale( trainingImageResiduals ),
+       scale( trainingCognitiveResiduals ) ), verbose = TRUE,
+     its = 20, mycoption = 0, sparseness = c( 0.02, -0.9 ), nvecs = 11,
+     inmask = c( grayMatterMask, NA ), cthresh = c( 1000, 0 ), smooth = 0.5 )
+
+predictedTrainingCognitiveBattery <- data.frame( Voxels = trainingImageData %*%
+   cognitiveSccanResult$eig1 %*% t( cognitiveSccanResult$eig2 ) )
+
+predictedTestingCognitiveBattery <- data.frame( Voxels = testingImageData %*%
+   cognitiveSccanResult$eig1 %*% t( cognitiveSccanResult$eig2 ) )
+
+testingCorrelationPvalues <- rep( NA, ncol( testingCognitiveData ) )
+
+for( i in 1:ncol( testingCognitiveData ) )
+  {
+  testingCorrelationPvalues[i] <- cor.test( data.matrix( testingCognitiveData )[, i],
+    predictedTestingCognitiveBattery[, i] )$p.value
+  cognitiveDataFrame <- data.frame( PredictedCognitive =
+    predictedTestingCognitiveBattery[, i], RealCognitive = testingCognitiveData[, i] )
+  testingLm <- lm( PredictedCognitive ~ RealCognitive, data = cognitiveDataFrame )
+  title <- paste( colnames( testingCognitiveData )[i],
+    cor( data.matrix( testingCognitiveData )[, i],
+    predictedTestingCognitiveBattery[, i] ) )
+  visreg( testingLm , main = title )
+  }
+
+# Correct for multiple comparisons testing and print those cognitive batteries that
+# can be predicted using the decomposed imaging data.
+
+testingCorrelationPvalues[is.na( testingCorrelationPvalues )] <- 1
+testingCorrelationPvalues <- p.adjust( testingCorrelationPvalues, method = 'BH' )
+
+significantIndices <- which( testingCorrelationPvalues <= 0.05 )
+
+testingCorrelationPvaluesDataFrame <- data.frame( Battery =
+  colnames( testingCognitiveData )[significantIndices],
+  Qvalue = testingCorrelationPvalues[significantIndices] )
+
+pander( testingCorrelationPvaluesDataFrame, style = "rmarkdown", caption =
+  "Cognitive batteries capable of being predicted and significance value after
+  multiple comparisons correction." )
+```
 
 \newpage
 
@@ -764,12 +819,10 @@ that this accounts for the colors not seeming to coordinate across Figures 1, 2,
 
 * (priorinitialization, line 350) Is the ``abs()`` call necessary?  I thought the elements
 of the eigenvector are constrained to be positive.
-
 <!--
 * Does clustering in the pheatmap tell us anything?  Ben used it, I believe, in his
 paper.
 -->
-
 * In the tutorial, you set ``copt <- 0`` and write ``# 0 for most applications, 1 for priors``.
 However, in the rcode chunk ``priorinitialization`` you use ``mycoption = 0``.  Was there a
 reason for this?  It seems like ``0`` represents a compromise between spatial orthogonality
@@ -778,7 +831,6 @@ vs. pseudo-eigenvector.
 
 * For the various options of dealing with nuisance variables, could one residualize out the
 effects of the nuisance variables and then just work on the "clean" data?
-
 
 \newpage
 
