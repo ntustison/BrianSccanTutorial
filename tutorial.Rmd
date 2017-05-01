@@ -25,7 +25,8 @@ and, to improve solution interpretability and stability, SCCAN allows one to
 to use prior knowledge to constrain the solution space.  
 
 Another view (perhaps simpler and broader) is that eigenanatomy is a general framework for reducing
-the dimensionality of imaging data into interpretable pieces. Eigenanatomy is motivated
+the dimensionality of imaging data into interpretable pieces.  With mass-univariate testing
+Eigenanatomy is motivated
 by two ideas:
 \begin{center}
 {\it Voxels that change together should hang together.}
@@ -61,6 +62,151 @@ potential collinearity of the "eigenvectors" (or, more accurately, the "pseudo-e
 since they do not necessarily satisfy orthogonality) resulting from optimization of the
 eigenvalue problem modified by constraints (e.g., positivity and sparsity)
 [@Avants2014;@Kandel:2015aa].  
+
+
+## Simple example
+
+```{r simpleexample, fig.width = 5.75, fig.height = 4, echo = TRUE, message = FALSE, warning = FALSE }
+# Disclaimer:  This is an example I (Nick) put together to conceptually illustrate
+# a subset of the motivating principles behind SCCAN as I understand them (which,
+# admittedly, might not be very well).  I need verify with Brian so take it with
+# a grain of salt for now.  
+#
+# With mass univariate testing, there are certain obvious things that one does to
+# reduce the number of statistical tests performed.  For example, we limit testing
+# to masked regions of interest.  Obviously, we completely ignore image values
+# in the skull if we are only interested in white matter differences and one of the
+# reasons why we develop processing tools to get good regional masks is precisely
+# to reduce the number of tests performed.  Decomposition methods, such as SCCAN,
+# while also using regional masks, try to reduce the number of tests even further
+# by finding those regions which actually demonstrate variance.  And we do this before
+# statistical testing for purposes of increased statistical power.  If an area
+# (e.g., fornix) doesn't actually demonstrate (e.g., FA) intensity variation,
+# why should we waste statistical power by testing that area?  
+#
+# In addition, we can even further reduce statistical testing by combining regions
+# which happen to be correlated in their variation which can be done with decomposition
+# techniques such as PCA.  And this is what is demonstrated in the example below.
+# Suppose we have two regions, which could be voxels or anatomical regions (e.g.,
+# Fornix and Splenium), and the intensity (e.g., FA) differences between two groups
+# ("experimental" and "control") are correlated.  With a univariate paradigm, we
+# would perform two statistical t-tests and then correct for multiple comparisons.
+# This could lead to non-significance for one or both regions which would mask
+# what is actually occurring.  Instead, we perform PCA which reveals that the two
+# regions are correlated.  We then perform testing in this decomposed space which
+# shows significance and we don't have to perform multiple comparisons correction!
+#
+# Because of the simplicity of this example, we omit some key concepts associated
+# with SCCAN such as sparsity, clustering, and the multi-modal CCA aspects of SCCAN.  
+# However, those concepts will be explored in the actual imaging examples below.
+
+library( ggplot2 )
+library( MASS )
+library( pander )
+
+rootDirectory <- "./"
+knitr::opts_knit$set( root.dir = rootDirectory )
+knitr::opts_chunk$set( comment = "" )
+
+figuresDirectory <- paste0( rootDirectory, "Figures/" )
+if( ! dir.exists( figuresDirectory ) )
+  {
+  dir.create( paste0( rootDirectory, "Figures/" ) )
+  }
+dataDirectory <- paste0( rootDirectory, "Data/" );
+
+# We first generate sample data for two fictional regions where we're looking
+# at tissue differences between a control group and an experimental group.  
+# These differences could be something like gray matter desnity or fractional
+# anisotropy.  We design the data so that it is correlated (as many real data
+# are) between the two regions.  
+
+set.seed( 123 )
+
+numberOfControls <- 30
+numberOfExperimentals <- 35
+
+rotationMatrix <- matrix( c( 0.707, 0.4, 0.707, 0.707 ), nrow = 2 )
+
+controlSigma <- matrix( 0.001 * c( 1, 0.05, 0.05, 1 ), nrow = 2 ) %*% rotationMatrix
+controlValues <- mvrnorm( numberOfControls, c( 0.6, 0.6 ), controlSigma )
+
+experimentalSigma <- matrix( 0.001 * c( 1, 0.05, 0.05, 1 ), nrow = 2 ) %*% rotationMatrix
+experimentalValues <- mvrnorm( numberOfExperimentals, c( 0.585, 0.585 ), experimentalSigma )
+
+studyDataFrame <- data.frame(
+  Group = factor( c( rep( 'Control', numberOfControls ),
+                     rep( 'Experimental', numberOfExperimentals ) ) ),
+  Region1 = c( controlValues[, 2], experimentalValues[, 2] ),
+  Region2 = c( controlValues[, 1], experimentalValues[, 1] ) )
+
+# Perform PCA on the study data using Region1 and Region2 columns and then
+# rotate the canonical coordinates based on the PCA decomposition.  We want
+# to use this to display and show the directions of variance in the sample data.
+
+studyPca <- prcomp( studyDataFrame[, 2:3], center = TRUE, scale = TRUE )
+rotatedCoordinates <- studyPca$rotation %*% matrix( c( 1, 0, 0, 1 ), nrow = 2 )
+
+xlimits <- c( 0.55, 0.66 )
+ylimits <- c( 0.55, 0.66 )
+
+arrowPosition <- data.frame( Group = c( "Control", "Control" ),
+                             x = rep( mean( xlimits ), 2 ),
+                             y = rep( mean( ylimits ), 2 ),
+                             xrot = rotatedCoordinates[1, ],
+                             yrot = rotatedCoordinates[2, ]
+                           )
+arrowPosition$xend <- arrowPosition$x +
+  0.4 * arrowPosition$xrot * ( xlimits[2] - xlimits[1] ) * ( studyPca$sdev )^2
+arrowPosition$yend <- arrowPosition$y +
+  0.4 * arrowPosition$yrot * ( ylimits[2] - ylimits[1] ) * ( studyPca$sdev )^2
+
+# Plot the fictitious data
+
+studyPlot <- ggplot( studyDataFrame,
+   aes( x = Region1, y = Region2, colour = Group ) ) +
+   geom_segment( data = arrowPosition, aes( x = x, y = y, xend = xend, yend = yend ),
+                 colour = "black", arrow = arrow(), size = 0.5, linetype = "dashed" ) +
+   geom_point( size = 5, alpha = 0.8 ) +
+   xlab( "Region 1" ) + ylab( "Region 2" ) +
+   xlim( xlimits ) + ylim( ylimits )
+
+studyPlotFile <- paste0( figuresDirectory, 'simpleExamplePlot.pdf' )
+ggsave( filename = studyPlotFile, plot = studyPlot, width = 5.75, height = 4 )
+```
+
+![Fictitious data showing regional brain values (e.g., gray matter or FA) between two groups.  Note that the data is correlated between the two regions and we show the principal components of variance using PCA decomposition and illustrate this difference with the plotted arrows.](`r studyPlotFile`)
+
+```{r simpleexample2, fig.width = 4.5, fig.height = 4, echo = TRUE, message = FALSE, warning = FALSE }
+
+# Since PCA tells us that we can decompose the data such that a single eigenvector
+# explains ~80% of the variance in the data (cf command:  summary( studyPca ) ), we
+# transform that data and do a single test (instead of two) along the principal
+# variance direction.
+
+studyDataFrame$TransformedData <-  
+  data.matrix( studyDataFrame[, 2:3] ) %*% studyPca$rotation[, 1]
+studyTtest <- t.test( TransformedData ~ Group, data = studyDataFrame )
+
+# We also perform independent testing of the two regions and adjust accordingly.
+
+studyTtest1 <- t.test( Region1 ~ Group, data = studyDataFrame )
+studyTtest2 <- t.test( Region2 ~ Group, data = studyDataFrame )
+
+qvalues <- p.adjust( c( studyTtest1$p.value, studyTtest2$p.value ), method = "holm" )
+
+studyReportDataFrame <- data.frame(
+  TestNames = c( "Region 1", "Region 2", "PCA Transformed" ),
+  Pvalues = c( studyTtest1$p.value, studyTtest2$p.value, studyTtest$p.value ),
+  AdjustedPvalues = c( qvalues, NA ) )
+colnames( studyReportDataFrame ) <- c( "Regions", "p-values", "Adjusted p-values" )
+
+pander( studyReportDataFrame, style = "rmarkdown", caption = "Statistical testing of
+the two regions as well as the PCA transformation of the data which takes into account
+the correlated nature of both regions.   Note that the traditional univariate paradigm
+results in the non-significance of Region 2 whereas testing the PCA transformed
+data maintains the significance of both regions." )
+```
 
 ## Applications
 
@@ -154,17 +300,6 @@ library( randomForest )
 library( ggplot2 )
 library( stargazer )
 invisible( suppressMessages( library( ANTsR ) ) )
-
-rootDirectory <- "./"
-knitr::opts_knit$set( root.dir = rootDirectory )
-knitr::opts_chunk$set( comment = "" )
-
-figuresDirectory <- paste0( rootDirectory, "Figures/" )
-if( ! dir.exists( figuresDirectory ) )
-  {
-  dir.create( paste0( rootDirectory, "Figures/" ) )
-  }
-dataDirectory <- paste0( rootDirectory, "Data/" );
 ```
 
 ## Read input data
