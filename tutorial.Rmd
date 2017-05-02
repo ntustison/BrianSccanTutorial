@@ -60,7 +60,7 @@ and can produce negative weights which limits biological interpretability [@Kand
 One potentially problematic issue with sparse matrix decompositions, such as SCCAN, is the
 potential collinearity of the "eigenvectors" (or, more accurately, the "pseudo-eigenvectors"
 since they do not necessarily satisfy orthogonality) resulting from optimization of the
-eigenvalue problem modified by constraints (e.g., positivity and sparsity)
+eigenvalue problem modified by constraints (e.g., positivity and sparseness)
 [@Avants2014;@Kandel:2015aa].  
 
 
@@ -97,7 +97,7 @@ eigenvalue problem modified by constraints (e.g., positivity and sparsity)
 # shows significance and we don't have to perform multiple comparisons correction!
 #
 # Because of the simplicity of this example, we omit some key concepts associated
-# with SCCAN such as sparsity, clustering, and the multi-modal CCA aspects of SCCAN.  
+# with SCCAN such as sparseness, clustering, and the multi-modal CCA aspects of SCCAN.
 # However, those concepts will be explored in the actual imaging examples below.
 
 library( ggplot2 )
@@ -117,7 +117,7 @@ dataDirectory <- paste0( rootDirectory, "Data/" );
 
 # We first generate sample data for two fictional regions where we're looking
 # at tissue differences between a control group and an experimental group.  
-# These differences could be something like gray matter desnity or fractional
+# These differences could be something like gray matter density or fractional
 # anisotropy.  We design the data so that it is correlated (as many real data
 # are) between the two regions.  
 
@@ -132,7 +132,8 @@ controlSigma <- matrix( 0.001 * c( 1, 0.05, 0.05, 1 ), nrow = 2 ) %*% rotationMa
 controlValues <- mvrnorm( numberOfControls, c( 0.6, 0.6 ), controlSigma )
 
 experimentalSigma <- matrix( 0.001 * c( 1, 0.05, 0.05, 1 ), nrow = 2 ) %*% rotationMatrix
-experimentalValues <- mvrnorm( numberOfExperimentals, c( 0.585, 0.585 ), experimentalSigma )
+experimentalValues <- mvrnorm( numberOfExperimentals, c( 0.585, 0.585 ),
+  experimentalSigma )
 
 studyDataFrame <- data.frame(
   Group = factor( c( rep( 'Control', numberOfControls ),
@@ -344,15 +345,15 @@ testingCognitiveData <- read.csv( paste0( dataDirectory, "pbac_test_cog.csv" ) )
 # optimization criterion based on the training data.
 
 trainingAgeMatrix <- matrix( trainingCognitiveData$age, ncol = 1 )
-sparsityValues <- seq( from = 0.01, to = 0.1, length = 10 )
-trainingAgeCorrelations <- rep( 0, length( sparsityValues ) )
-testingAgeCorrelations <- rep( 0, length( sparsityValues ) )
+sparsenessValues <- seq( from = 0.01, to = 0.1, length = 10 )
+trainingAgeCorrelations <- rep( 0, length( sparsenessValues ) )
+testingAgeCorrelations <- rep( 0, length( sparsenessValues ) )
 
-for( i in 1:length( sparsityValues ) )
+for( i in 1:length( sparsenessValues ) )
   {
   ageSccanResults <- sparseDecom2(
     inmatrix = list( scale( trainingImageData ), scale( trainingAgeMatrix ) ),
-    sparseness = c( sparsityValues[i], 0.9 ), inmask = c( grayMatterMask, NA ),
+    sparseness = c( sparsenessValues[i], 0.9 ), inmask = c( grayMatterMask, NA ),
     nvecs = 2, mycoption = 0, cthresh = c( 1000, 0 ), ell1 = 10, smooth = 0.5,
     verbose = 0 )
 
@@ -374,15 +375,15 @@ for( i in 1:length( sparsityValues ) )
   testingAgeCorrelations[i] <- cor( testingAgePredictors, testingCognitiveData$age )
   }
 sparseRegressionDataFrame <- data.frame(
-                  sparsityValues = sparsityValues,
+                  sparsenessValues = sparsenessValues,
                   trainingAgeCorrelations = trainingAgeCorrelations,
                   testingAgeCorrelations = testingAgeCorrelations )
 
-trainingLm <- lm( trainingAgeCorrelations ~ sparsityValues + I( sparsityValues^2 ) )
-visreg( trainingLm, xlab = "Sparsity", ylab = "Correlation" )
+trainingLm <- lm( trainingAgeCorrelations ~ sparsenessValues + I( sparsenessValues^2 ) )
+visreg( trainingLm, xlab = "Sparseness", ylab = "Correlation" )
 
-testingLm <- lm( testingAgeCorrelations ~ sparsityValues + I( sparsityValues^2 ) )                  
-visreg( testingLm, xlab = "Sparsity", ylab = "Correlation" )
+testingLm <- lm( testingAgeCorrelations ~ sparsenessValues + I( sparsenessValues^2 ) )
+visreg( testingLm, xlab = "Sparseness", ylab = "Correlation" )
 ```
 \newpage
 
@@ -393,8 +394,8 @@ visreg( testingLm, xlab = "Sparsity", ylab = "Correlation" )
 # regions relating to the battery of tests that measure language-related cognitive
 # function.  Due to the language association, we initialize SCCAN with left
 # hemispheric regions.  In this case, the initialization controls the sparseness
-# parameters for each eigenvector.  Thus, the sparsity parameter will be overridden
-# by the priors, thereby enabling a "per eigenvector" sparsity value.
+# parameters for each eigenvector.  Thus, the sparseness parameter will be overridden
+# by the priors, thereby enabling a "per eigenvector" sparseness value.
 
 languageBatteryTypes <- c( "Speech", "Writing", "Semantic", "Reading", "Naming" )
 
@@ -471,8 +472,9 @@ for( i in 1:length( priorWeights ) )
   {
   cognitiveSccanResult <- sparseDecom2(
        inmatrix = list( scale( trainingImageData ), scale( trainingCognitiveMatrix ) ),
-       its = 20, mycoption = 0, sparseness = c( 0, -0.5 ), nvecs = numberOfCognitiveLabels,
-       inmask = c( grayMatterMask, NA ), cthresh = c( 1000, 0 ), verbose = 0, ell1 = 10,
+       its = 20, mycoption = 0, sparseness = c( 0, -0.5 ),
+       nvecs = numberOfCognitiveLabels, inmask = c( grayMatterMask, NA ),
+       cthresh = c( 1000, 0 ), verbose = 0, ell1 = 10,
        initializationList = eigenInitialization$initlist, priorWeight = priorWeights[i],
        smooth = 0, perms = 0 )
 
@@ -516,10 +518,10 @@ for( i in 1:length( priorWeights ) )
   # pdf document but write them to disk for perusal and to illustrate use
   # case.  
 
-  languagePriorWeightsSccanPlotFiles[i] <- paste0( figuresDirectory,
-    "cognitiveSccanEigenImages_PriorWeight", priorWeights[i], ".jpg" )
-  plot( grayMatterMask, cognitiveSccanImages, color.overlay = cognitiveSccanColors,
-        axis = 1, nslices = 20, outname = languagePriorWeightsSccanPlotFiles[i] )
+  # languagePriorWeightsSccanPlotFiles[i] <- paste0( figuresDirectory,
+  #   "cognitiveSccanEigenImages_PriorWeight", priorWeights[i], ".jpg" )
+  # plot( grayMatterMask, cognitiveSccanImages, color.overlay = cognitiveSccanColors,
+  #       axis = 1, nslices = 20, outname = languagePriorWeightsSccanPlotFiles[i] )
 
   # Create 3-D brain volumetric rendering.  These are rendered in Figures 1-4.
 
@@ -632,7 +634,7 @@ eigenInitialization <- initializeEigenanatomy( aalLanguageRegionalLabelMatrix,
 
 cognitiveSccanResult <- sparseDecom2(
      inmatrix = list( scale( trainingImageData ), scale( trainingCognitiveMatrix ) ),
-     its = 20, mycoption = 0, sparseness = c( 0, -0.9 ), nvecs = numberOfCognitiveLabels,
+     its = 20, mycoption = 0, sparseness = c( 0.05, -0.9 ), nvecs = numberOfCognitiveLabels,
      inmask = c( grayMatterMask, NA ), cthresh = c( 1000, 0 ), verbose = 0, ell1 = 10,
      initializationList = eigenInitialization$initlist, priorWeight = 0.1,
      smooth = 0, perms = 0 )
@@ -687,7 +689,8 @@ eigenInitialization <- initializeEigenanatomy( aalLanguageRegionalLabelMatrix,
                         grayMatterMask )
 
 cognitiveSccanResult <- sparseDecom2(
-     inmatrix = list( scale( trainingImageResiduals ), scale( trainingCognitiveResiduals ) ),
+     inmatrix = list( scale( trainingImageResiduals ),
+                      scale( trainingCognitiveResiduals ) ),
      its = 20, mycoption = 0, sparseness = c( 0, -0.9 ), nvecs = numberOfCognitiveLabels,
      inmask = c( grayMatterMask, NA ), cthresh = c( 1000, 0 ), verbose = 0, ell1 = 10,
      initializationList = eigenInitialization$initlist, priorWeight = 0.1,
