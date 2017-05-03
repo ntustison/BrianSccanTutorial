@@ -69,8 +69,7 @@ eigenvalue problem modified by constraints (e.g., positivity and sparseness)
 ```{r simpleexample, fig.width = 5.75, fig.height = 4, echo = TRUE, message = FALSE, warning = FALSE }
 # Disclaimer:  This is an example I (Nick) put together to conceptually illustrate
 # a subset of the motivating principles behind SCCAN as I understand them (which,
-# admittedly, might not be very well).  I need verify with Brian so take it with
-# a grain of salt for now.  
+# admittedly, might not be very well).  
 #
 # With mass univariate testing, there are certain obvious things that one does to
 # reduce the number of statistical tests performed.  For example, we limit testing
@@ -215,9 +214,17 @@ SCCAN-related methods have been applied in the following papers:
 
 * _Dementia induces correlated reductions in white matter integrity and
 cortical thickness: a multivariate neuroimaging study with sparse canonical correlation
-analysis_ [@Avants:2010aa].
+analysis_ [@Avants:2010aa].  SCCAN is used to discover mutually predictive
+neuroanatomical regions in fractional anisotropy and cortical thickness maps
+using AD, FTD, and control cohorts.  Anatomical regions predicted by SCCAN
+as being affected by disease were later confirmed at autopsy via CSF analyses
+of AD- or FTD- associated proteins.
 
 * _Methodological considerations in longitudinal morphometry of traumatic brain injury_ [@Kim:2013aa].
+After an overview concerning processing for TBI studies, a longitudinal
+study involving 4 cohort studies were analyzed using SCCAN techniques.  Cortical
+thickness and white matter volumetric changes (using the Jacobian determinant
+ image) were used to identify longitudinal changes.  
 
 * _Sparse canonical correlation analysis relates network-level atrophy to multivariate
 cognitive measures in a neurodegenerative population_ [@Avants2014].  Repeatable
@@ -243,10 +250,18 @@ connectivity patterns are then used to classify mild cognitive impairment subjec
 cognitively normal subjects.
 
 * _White matter imaging helps dissociate tau from TDP-43 in frontotemporal lobar degeneration_ [@McMillan2013].
+Using Eigenanatomy principles, decomposition of GM cortical thickness and WM FA values
+lead to a sparse set of anatomical predictors which are tested on a cohort of frontotemporal
+lobard degeneration.
 
-* _The power of neuroimaging biomarkers for screening frontotemporal dementia_ [@McMillan2014].
+* _The power of neuroimaging biomarkers for screening frontotemporal dementia_ [@McMillan2014].  FTD can
+result from either frontotemporal lobar degeneration or Alzheimer's disease.  Data-derived ROIs from
+Eigenanatomy was compared with global measures and anatomical volumes of interest in FA and gray matter
+cortical thickness values in predicting diagnoses.
 
 * _Genetic and neuroanatomic associations in sporadic frontotemporal lobar degeneration_ [@McMillan2014a].
+Neuroimaging incorporating gray matter density and fractional anisotropy were used to find anatomical
+and genetic associations corresponding to frontotemporal lobar degeneration.
 
 ## ANTsR implementation
 
@@ -919,7 +934,10 @@ pander( testingCorrelationPvaluesDataFrame, style = "rmarkdown", caption =
   multiple comparisons correction." )
 ```
 
+<!--
+
 \newpage
+
 
 # Questions for Brian:
 
@@ -957,10 +975,10 @@ that this accounts for the colors not seeming to coordinate across Figures 1, 2,
 
 * (priorinitialization, line 350) Is the ``abs()`` call necessary?  I thought the elements
 of the eigenvector are constrained to be positive.
-<!--
+
 * Does clustering in the pheatmap tell us anything?  Ben used it, I believe, in his
 paper.
--->
+
 * In the tutorial, you set ``copt <- 0`` and write ``# 0 for most applications, 1 for priors``.
 However, in the rcode chunk ``priorinitialization`` you use ``mycoption = 0``.  Was there a
 reason for this?  It seems like ``0`` represents a compromise between spatial orthogonality
@@ -969,6 +987,8 @@ vs. pseudo-eigenvector.
 
 * For the various options of dealing with nuisance variables, could one residualize out the
 effects of the nuisance variables and then just work on the "clean" data?
+
+-->
 
 \newpage
 
